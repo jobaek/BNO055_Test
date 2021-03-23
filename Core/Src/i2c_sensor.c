@@ -29,6 +29,59 @@ I2C_HandleTypeDef *hi2c_sensor;
  *  device address with global structure bno055_t
  *-------------------------------------------------------------------------*/
 
+/* USER CODE BEGIN Header_BNO055_Task */
+/**
+* @brief Function implementing the myTask02 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_BNO055_Task */
+void BNO055_Task(void *argument)
+{
+  /* USER CODE BEGIN BNO055_Task */
+  /* Variable used to return value of
+   * communication routine*/
+  s32 comres = BNO055_ERROR;
+
+	/*  Based on the user need configure I2C interface.
+	 *  It is example code to explain how to use the bno055 API*/
+	I2C_routine();
+
+  /*--------------------------------------------------------------------------*
+   *  This API used to assign the value/reference of
+   *  the following parameters
+   *  I2C address
+   *  Bus Write
+   *  Bus read
+   *  Chip id
+   *  Page id
+   *  Accel revision id
+   *  Mag revision id
+   *  Gyro revision id
+   *  Boot loader revision id
+   *  Software revision id
+   *-------------------------------------------------------------------------*/
+  comres = bno055_init(&bno055);
+
+  printf("= CHIP ID 	: 0x%X\r\n", bno055.chip_id);
+  printf("= SW Rev 		: 0x%X\r\n", bno055.sw_rev_id);
+  printf("= PAGE ID 	: 0x%X\r\n", bno055.page_id);
+  printf("= ACC ID 		: 0x%X\r\n", bno055.accel_rev_id);
+  printf("= MAG ID 		: 0x%X\r\n", bno055.mag_rev_id);
+  printf("= GYRO ID 	: 0x%X\r\n", bno055.gyro_rev_id);
+  printf("= BOOT Rev	: 0x%X\r\n", bno055.bl_rev_id);
+
+  /* Infinite loop */
+  for(;;)
+  {
+
+  	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+
+  	osDelay(500);
+  }
+  /* USER CODE END BNO055_Task */
+}
+
 /*-------------------------------------------------------------------------*
  *  By using bno055 the following structure parameter can be accessed
  *  Bus write function pointer: BNO055_WR_FUNC_PTR

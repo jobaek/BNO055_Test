@@ -10,6 +10,13 @@
 #include "cmsis_os.h"
 #include "bno055.h"
 
+//s8 BNO055_Read_Accel(struct bno055_accel_t *xyz);
+//s8 BNO055_Read_Mag(struct bno055_mag_t *xyz);
+//s8 BNO055_Read_Gyro(struct bno055_gyro_t *xyz);
+s8 BNO055_Initialize(struct bno055_t *bno);
+s8 BNO055_Read_RawData(struct bno055_accel_t *acc, struct bno055_gyro_t *gyro, struct bno055_mag_t *mag);
+s8 BNO055_Read_FusionData(struct bno055_euler_t *hrp, struct bno055_quaternion_t *quater, struct bno055_linear_accel_t *acc, struct bno055_gravity_t *gravity);
+
 s8 BNO055_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt);
 s8 BNO055_I2C_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt);
 void BNO055_delay_msek(u32 msec);
@@ -17,12 +24,63 @@ void BNO055_delay_msek(u32 msec);
 
 #ifdef  BNO055_API
 
+/*********read raw accel, gyro, mag data***********/
+/* variable used to read the accel xyz data */
+struct bno055_accel_t accel_xyz;
+
+/* structure used to read the mag xyz data */
+struct bno055_mag_t mag_xyz;
+
+/* structure used to read the gyro xyz data */
+struct bno055_gyro_t gyro_xyz;
+
+/* structure used to read the euler hrp data */
+struct bno055_euler_t euler_hrp;
+
+/* structure used to read the quaternion wxyz data */
+struct bno055_quaternion_t quaternion_wxyz;
+
+///?//
+/************read accel/gyro/mag converted data***********/
+/* structure used to read the linear accel xyz data */
+struct bno055_linear_accel_t linear_acce_xyz;
+
+/* structure used to read the gravity xyz data */
+struct bno055_gravity_t gravity_xyz;
+
+///* structure used to read the accel xyz data output as m/s2 or mg */
+//struct bno055_accel_double_t d_accel_xyz;
+//
+///* structure used to read the gyro xyz data output as dps or rps */
+//struct bno055_gyro_double_t d_gyro_xyz;
+//
+///* structure used to read the mag xyz data output as uT*/
+//struct bno055_mag_double_t d_mag_xyz;
+
+///* structure used to read the euler hrp data output
+// * as as degree or radians */
+//struct bno055_euler_double_t d_euler_hpr;
+//
+///* structure used to read the linear accel xyz data output as m/s2*/
+//struct bno055_linear_accel_double_t d_linear_accel_xyz;
+///* structure used to read the gravity xyz data output as m/s2*/
+//struct bno055_gravity_double_t d_gravity_xyz;
+
+
+///?//
+
+
+
 /************** I2C buffer length******/
 
 #define I2C_BUFFER_LEN 										8
 #define BNO055_I2C_BUS_WRITE_ARRAY_INDEX ((u8)1)
 
 I2C_HandleTypeDef *hi2c_sensor;
+
+/* variable used to set the power mode of the sensor*/
+u8 power_mode = BNO055_INIT_VALUE;
+u8 op_mode = BNO055_INIT_VALUE;
 
 /*--------------------------------------------------------------------------*
  *  The following API is used to map the I2C bus read, write, delay and
@@ -61,8 +119,43 @@ void BNO055_Task(void *argument)
    *  Boot loader revision id
    *  Software revision id
    *-------------------------------------------------------------------------*/
-  comres = bno055_init(&bno055);
+	comres = BNO055_Initialize(&bno055);
 
+  /* Infinite loop */
+  for(;;)
+  {
+
+//  	BNO055_Read_RawData(&accel_xyz, &gyro_xyz, &mag_xyz);
+  	BNO055_Read_FusionData(&euler_hrp, &quaternion_wxyz, &linear_acce_xyz, &gravity_xyz);
+
+  	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+
+  	osDelay(1000);
+  }
+  /* USER CODE END BNO055_Task */
+}
+
+s8 BNO055_Initialize(struct bno055_t *bno)
+{
+	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+
+  /*--------------------------------------------------------------------------*
+   *  This API used to assign the value/reference of
+   *  the following parameters
+   *  I2C address
+   *  Bus Write
+   *  Bus read
+   *  Chip id
+   *  Page id
+   *  Accel revision id
+   *  Mag revision id
+   *  Gyro revision id
+   *  Boot loader revision id
+   *  Software revision id
+   *-------------------------------------------------------------------------*/
+	com_rslt = bno055_init(bno);
+
+#ifdef BNO055_DEBUG
   printf("= CHIP ID 	: 0x%X\r\n", bno055.chip_id);
   printf("= SW Rev 		: 0x%X\r\n", bno055.sw_rev_id);
   printf("= PAGE ID 	: 0x%X\r\n", bno055.page_id);
@@ -70,17 +163,112 @@ void BNO055_Task(void *argument)
   printf("= MAG ID 		: 0x%X\r\n", bno055.mag_rev_id);
   printf("= GYRO ID 	: 0x%X\r\n", bno055.gyro_rev_id);
   printf("= BOOT Rev	: 0x%X\r\n", bno055.bl_rev_id);
+#endif
 
-  /* Infinite loop */
-  for(;;)
-  {
+  /*  For initializing the BNO sensor it is required to the operation mode
+   * of the sensor as NORMAL
+   * Normal mode can set from the register
+   * Page - page0
+   * register - 0x3E
+   * bit positions - 0 and 1*/
+  /* set the power mode as NORMAL*/
+  power_mode = BNO055_POWER_MODE_NORMAL;
+  com_rslt += bno055_set_power_mode(power_mode);
 
-  	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	com_rslt += bno055_get_power_mode(&power_mode);
 
-  	osDelay(500);
-  }
-  /* USER CODE END BNO055_Task */
+  if (power_mode == BNO055_POWER_MODE_NORMAL)
+  	return BNO055_SUCCESS;
+
+	return com_rslt;
 }
+
+s8 BNO055_Read_RawData(struct bno055_accel_t *acc, struct bno055_gyro_t *gyro, struct bno055_mag_t *mag)
+{
+	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+
+	op_mode = BNO055_OPERATION_MODE_AMG;
+	com_rslt += bno055_set_operation_mode(op_mode);
+
+	com_rslt += bno055_get_operation_mode(&op_mode);
+
+  if (op_mode == BNO055_OPERATION_MODE_AMG)
+  {
+  	com_rslt += bno055_read_accel_xyz(acc);
+
+  	com_rslt += bno055_read_gyro_xyz(gyro);
+
+  	com_rslt += bno055_read_mag_xyz(mag);
+
+#ifdef BNO055_DEBUG
+	printf("\r\n= BNO055 RAW Data\r\n");
+	printf("= ACC : %d, %d, %d\r\n", acc->x, acc->y, acc->z);
+	printf("= GYRO : %d, %d, %d\r\n", gyro->x, gyro->y, gyro->z);
+	printf("= MAG : %d, %d, %d\r\n", mag->x, mag->y, mag->z);
+#endif
+  }
+
+	return com_rslt;
+}
+
+s8 BNO055_Read_FusionData(struct bno055_euler_t *euler, struct bno055_quaternion_t *quater, struct bno055_linear_accel_t *acc, struct bno055_gravity_t *gravity)
+{
+	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+
+	op_mode = BNO055_OPERATION_MODE_NDOF;
+	com_rslt += bno055_set_operation_mode(op_mode);
+
+	com_rslt += bno055_get_operation_mode(&op_mode);
+
+  if (op_mode == BNO055_OPERATION_MODE_NDOF)
+  {
+  	com_rslt += bno055_read_euler_hrp(euler);
+
+  	com_rslt += bno055_read_quaternion_wxyz(quater);
+
+  	com_rslt += bno055_read_linear_accel_xyz(acc);
+
+  	com_rslt += bno055_read_gravity_xyz(gravity);
+
+#ifdef BNO055_DEBUG
+	printf("\r\n= BNO055 FUSION Data\r\n");
+	printf("= EULER (HRP) : %d, %d, %d\r\n", euler->h/16, euler->r, euler->p);
+	printf("= QUATER (WXYZ) : %d, %d, %d, %d\r\n", quater->w, quater->x, quater->y, quater->z);
+	printf("= Linear ACC (XYZ) : %d, %d, %d\r\n", acc->x, acc->y, acc->z);
+	printf("= Linear Gravity (XYZ) : %d, %d, %d\r\n", gravity->x, gravity->y, gravity->z);
+#endif
+  }
+
+	return com_rslt;
+}
+
+
+//s8 BNO055_Read_Accel(struct bno055_accel_t *xyz)
+//{
+//	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+//
+//	com_rslt = bno055_read_accel_xyz(xyz);
+//
+//	return com_rslt;
+//}
+//
+//s8 BNO055_Read_Mag(struct bno055_mag_t *xyz)
+//{
+//	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+//
+//	com_rslt = bno055_read_mag_xyz(xyz);
+//
+//	return com_rslt;
+//}
+//
+//s8 BNO055_Read_Gyro(struct bno055_gyro_t *xyz)
+//{
+//	BNO055_RETURN_FUNCTION_TYPE com_rslt = BNO055_ERROR;
+//
+//	com_rslt = bno055_read_gyro_xyz(xyz);
+//
+//	return com_rslt;
+//}
 
 /*-------------------------------------------------------------------------*
  *  By using bno055 the following structure parameter can be accessed
@@ -148,7 +336,7 @@ s8 BNO055_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
  * in the I2C write string function
  * For more information please refer data sheet SPI communication:
  */
-    BNO055_iERROR = HAL_I2C_Master_Transmit(hi2c_sensor, (uint16_t)(bno055.dev_addr << 1), array, cnt, 1000);
+    BNO055_iERROR = HAL_I2C_Master_Transmit(hi2c_sensor, (uint16_t)(bno055.dev_addr << 1), array, cnt+1, 1000);
 
     return (s8)BNO055_iERROR;
 }

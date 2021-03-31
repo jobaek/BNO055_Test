@@ -12,6 +12,7 @@
 
 #define BNO055_API
 
+#define BNO055_DEBUG
 
 extern s8 I2C_routine(void);
 

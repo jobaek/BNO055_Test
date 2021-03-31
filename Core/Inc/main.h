@@ -106,7 +106,6 @@ void Error_Handler(void);
 
 extern I2C_HandleTypeDef hi2c1;
 
-extern struct bno055_t bno055;
 
 /* USER CODE END Private defines */
 
